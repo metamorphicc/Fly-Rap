@@ -1,0 +1,451 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Fly Rap Studio</title>
+  <style>
+    html, body {
+      margin: 0;
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+      background: #070606;
+      color: #f3ead7;
+      font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    }
+
+    #stage {
+      position: fixed;
+      inset: 0;
+      width: 100vw;
+      height: 100vh;
+      display: block;
+    }
+
+    .hud {
+      position: fixed;
+      inset: 0;
+      pointer-events: none;
+    }
+
+    .badge {
+      position: absolute;
+      left: 32px;
+      top: 34px;
+      width: 676px;
+      padding: 18px 20px;
+      border: 1px solid rgba(243, 234, 215, 0.2);
+      background: rgba(8, 8, 8, 0.62);
+      box-shadow: 0 20px 80px rgba(0,0,0,0.48), inset 0 1px rgba(255,255,255,0.08);
+      backdrop-filter: blur(12px);
+    }
+
+    .title {
+      display: flex;
+      justify-content: space-between;
+      gap: 14px;
+      font-size: 25px;
+      font-weight: 900;
+      letter-spacing: 0;
+    }
+
+    .meta {
+      display: grid;
+      grid-template-columns: 1fr 1fr 1fr;
+      gap: 12px;
+      margin-top: 14px;
+      font-size: 12px;
+      color: rgba(243, 234, 215, 0.66);
+    }
+
+    .meta b {
+      display: block;
+      margin-top: 4px;
+      color: #f3ead7;
+      font-size: 17px;
+    }
+
+    .lyrics {
+      position: absolute;
+      left: 32px;
+      right: 32px;
+      bottom: 168px;
+      padding: 18px 20px;
+      border-left: 4px solid #f6c75a;
+      background: linear-gradient(90deg, rgba(8,8,8,0.76), rgba(8,8,8,0.16));
+      font-size: 27px;
+      font-weight: 900;
+      line-height: 1.24;
+      text-shadow: 0 3px 18px rgba(0,0,0,0.9);
+    }
+
+    .transport {
+      position: absolute;
+      left: 32px;
+      right: 32px;
+      bottom: 78px;
+      height: 58px;
+      border: 1px solid rgba(243, 234, 215, 0.16);
+      background: rgba(8,8,8,0.58);
+      overflow: hidden;
+    }
+
+    .bar {
+      position: absolute;
+      left: 0;
+      top: 0;
+      height: 100%;
+      width: 0;
+      background: linear-gradient(90deg, rgba(246,199,90,0.22), rgba(93,224,180,0.28));
+    }
+
+    .ticks {
+      position: absolute;
+      inset: 0;
+      background-image: repeating-linear-gradient(90deg, rgba(243,234,215,0.12) 0 1px, transparent 1px 54px);
+    }
+
+    .footer {
+      position: absolute;
+      left: 32px;
+      right: 32px;
+      bottom: 28px;
+      display: flex;
+      justify-content: space-between;
+      color: rgba(243, 234, 215, 0.72);
+      font-size: 13px;
+    }
+  </style>
+</head>
+<body>
+<canvas id="stage"></canvas>
+<div class="hud">
+  <section class="badge">
+    <div class="title">
+      <span>FLY RAP STUDIO</span>
+      <span id="rec">REC ●</span>
+    </div>
+    <div class="meta">
+      <span>take<b id="take">03</b></span>
+      <span>bpm<b>92</b></span>
+      <span>mic chain<b>tiny booth / huge ego</b></span>
+    </div>
+  </section>
+  <div class="lyrics" id="lyrics">loading booth...</div>
+  <div class="transport">
+    <div class="bar" id="bar"></div>
+    <div class="ticks"></div>
+  </div>
+  <footer class="footer">
+    <span>original synth beat / no samples</span>
+    <span>stylized insect performance / studio gag</span>
+  </footer>
+</div>
+
+<script type="module">
+import * as THREE from 'https://unpkg.com/three@0.160.0/build/three.module.js';
+
+const canvas = document.getElementById('stage');
+const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: false, preserveDrawingBuffer: true });
+renderer.setPixelRatio(1);
+renderer.outputColorSpace = THREE.SRGBColorSpace;
+renderer.toneMapping = THREE.ACESFilmicToneMapping;
+renderer.toneMappingExposure = 1.32;
+renderer.shadowMap.enabled = true;
+renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(0x070606);
+scene.fog = new THREE.FogExp2(0x070606, 0.036);
+
+const camera = new THREE.PerspectiveCamera(35, 1080 / 1350, 0.1, 90);
+camera.position.set(4.2, 2.7, 6.6);
+camera.lookAt(0, 0.8, 0);
+
+const root = new THREE.Group();
+root.rotation.y = -0.34;
+scene.add(root);
+
+const fly = new THREE.Group();
+root.add(fly);
+
+const clock = new THREE.Clock();
+const ids = {
+  lyrics: document.getElementById('lyrics'),
+  bar: document.getElementById('bar'),
+  rec: document.getElementById('rec')
+};
+
+const mats = {
+  body: new THREE.MeshStandardMaterial({ color: 0x211b15, roughness: 0.62, metalness: 0.08 }),
+  abdomen: new THREE.MeshStandardMaterial({ color: 0x4c351c, roughness: 0.66, metalness: 0.04 }),
+  gold: new THREE.MeshStandardMaterial({ color: 0xe0a94a, roughness: 0.48, metalness: 0.08 }),
+  eye: new THREE.MeshStandardMaterial({ color: 0xb4101e, roughness: 0.34, metalness: 0.08, emissive: 0x3b0308, emissiveIntensity: 0.42 }),
+  leg: new THREE.MeshStandardMaterial({ color: 0x17120e, roughness: 0.74, metalness: 0.08 }),
+  wing: new THREE.MeshPhysicalMaterial({ color: 0xdff0ff, roughness: 0.2, transparent: true, opacity: 0.35, side: THREE.DoubleSide, depthWrite: false }),
+  chrome: new THREE.MeshStandardMaterial({ color: 0xc9c5b7, roughness: 0.22, metalness: 0.78 }),
+  black: new THREE.MeshStandardMaterial({ color: 0x050505, roughness: 0.56, metalness: 0.2 }),
+  foam: new THREE.MeshStandardMaterial({ color: 0x171716, roughness: 0.86, metalness: 0.02 }),
+  neonGreen: new THREE.MeshBasicMaterial({ color: 0x5de0b4 }),
+  neonPink: new THREE.MeshBasicMaterial({ color: 0xff4c7a }),
+  wall: new THREE.MeshStandardMaterial({ color: 0x15100e, roughness: 0.82, metalness: 0.02 }),
+  floor: new THREE.MeshStandardMaterial({ color: 0x0b0b0a, roughness: 0.7, metalness: 0.05 })
+};
+
+function mesh(geom, mat, parent = scene) {
+  const m = new THREE.Mesh(geom, mat);
+  m.castShadow = true;
+  m.receiveShadow = true;
+  parent.add(m);
+  return m;
+}
+
+function ellipsoid(parent, mat, pos, scale) {
+  const m = mesh(new THREE.SphereGeometry(1, 48, 28), mat, parent);
+  m.position.set(...pos);
+  m.scale.set(...scale);
+  return m;
+}
+
+const abdomen = ellipsoid(fly, mats.abdomen, [0, 0.45, -0.45], [0.78, 0.48, 1.05]);
+const thorax = ellipsoid(fly, mats.body, [0, 0.6, 0.48], [0.58, 0.52, 0.62]);
+const head = ellipsoid(fly, mats.body, [0, 0.74, 1.12], [0.48, 0.43, 0.43]);
+
+for (let i = 0; i < 4; i++) {
+  const stripe = mesh(new THREE.TorusGeometry(0.56 - i * 0.025, 0.014, 8, 72, Math.PI * 1.4), mats.gold, abdomen);
+  stripe.position.set(0, 0.02, 0.22 - i * 0.2);
+  stripe.rotation.set(Math.PI / 2, 0, Math.PI * 0.08);
+  stripe.scale.y = 0.68;
+}
+
+function eye(side) {
+  const e = ellipsoid(fly, mats.eye, [side * 0.33, 0.83, 1.36], [0.2, 0.26, 0.18]);
+  return e;
+}
+eye(-1); eye(1);
+
+function cylinder(parent, mat, radius = 0.03) {
+  const c = mesh(new THREE.CylinderGeometry(radius, radius, 1, 14), mat, parent);
+  return c;
+}
+
+function orient(m, a, b) {
+  const av = new THREE.Vector3(...a);
+  const bv = new THREE.Vector3(...b);
+  const mid = av.clone().add(bv).multiplyScalar(0.5);
+  const dir = bv.clone().sub(av);
+  const len = Math.max(0.001, dir.length());
+  m.position.copy(mid);
+  m.scale.set(1, len, 1);
+  m.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), dir.normalize());
+}
+
+const proboscis = cylinder(fly, mats.gold, 0.045);
+const antennae = [cylinder(fly, mats.gold, 0.018), cylinder(fly, mats.gold, 0.018)];
+
+function wing(side) {
+  const shape = new THREE.Shape();
+  shape.moveTo(0, 0);
+  shape.bezierCurveTo(side * 0.34, 0.2, side * 0.84, 0.25, side * 1.05, -0.06);
+  shape.bezierCurveTo(side * 1.35, -0.52, side * 0.82, -0.9, side * 0.08, -0.72);
+  shape.bezierCurveTo(side * -0.04, -0.38, side * -0.03, -0.12, 0, 0);
+  const w = mesh(new THREE.ShapeGeometry(shape, 32), mats.wing, fly);
+  w.position.set(side * 0.2, 0.92, 0.2);
+  w.rotation.set(-0.12, side * -0.38, side * 0.22);
+  w.renderOrder = 8;
+  return w;
+}
+const wingL = wing(-1);
+const wingR = wing(1);
+
+const legs = [];
+function makeLeg(side, idx, z) {
+  const hip = [side * 0.34, 0.47, z];
+  const upper = cylinder(fly, mats.leg, 0.035);
+  const lower = cylinder(fly, mats.leg, 0.03);
+  const knee = ellipsoid(fly, mats.gold, [0, 0, 0], [0.055, 0.055, 0.055]);
+  const foot = ellipsoid(fly, mats.leg, [0, 0, 0], [0.08, 0.035, 0.12]);
+  legs.push({ side, idx, z, hip, upper, lower, knee, foot });
+}
+for (const side of [-1, 1]) {
+  makeLeg(side, 0, 0.82);
+  makeLeg(side, 1, 0.28);
+  makeLeg(side, 2, -0.34);
+}
+
+function studio() {
+  const floor = mesh(new THREE.PlaneGeometry(18, 18), mats.floor);
+  floor.rotation.x = -Math.PI / 2;
+  floor.position.y = -0.08;
+
+  const back = mesh(new THREE.BoxGeometry(10, 5, 0.16), mats.wall);
+  back.position.set(0, 2.1, -3.1);
+
+  for (let i = -4; i <= 4; i++) {
+    const strip = mesh(new THREE.BoxGeometry(0.035, 3.7, 0.05), i % 2 ? mats.black : mats.wall);
+    strip.position.set(i * 0.55, 2.0, -3.0);
+  }
+
+  const rug = mesh(new THREE.CircleGeometry(2.35, 80), new THREE.MeshStandardMaterial({ color: 0x1b1110, roughness: 0.78, metalness: 0.02 }));
+  rug.rotation.x = -Math.PI / 2;
+  rug.position.y = -0.065;
+
+  const desk = new THREE.Group();
+  scene.add(desk);
+  const table = mesh(new THREE.BoxGeometry(3.6, 0.18, 1.1), mats.black, desk);
+  table.position.set(0, 0.52, -2.1);
+  const monL = mesh(new THREE.BoxGeometry(0.78, 0.48, 0.18), mats.black, desk);
+  monL.position.set(-1.05, 0.93, -1.9);
+  const monR = monL.clone();
+  monR.position.x = 1.05;
+  desk.add(monR);
+  const screenGeom = new THREE.PlaneGeometry(0.62, 0.32);
+  const screenL = mesh(screenGeom, mats.neonGreen, desk);
+  screenL.position.set(-1.05, 0.93, -1.79);
+  const screenR = mesh(screenGeom, mats.neonPink, desk);
+  screenR.position.set(1.05, 0.93, -1.79);
+
+  for (let i = 0; i < 9; i++) {
+    const knob = mesh(new THREE.CylinderGeometry(0.035, 0.035, 0.035, 12), mats.chrome, desk);
+    knob.position.set(-1.4 + i * 0.35, 0.65, -1.72);
+    knob.rotation.x = Math.PI / 2;
+  }
+
+  const sign = mesh(new THREE.PlaneGeometry(2.4, 0.42), new THREE.MeshBasicMaterial({ color: 0x201311 }), scene);
+  sign.position.set(0, 3.88, -2.9);
+  const signGlow = mesh(new THREE.TorusGeometry(0.95, 0.018, 8, 100, Math.PI * 2), mats.neonGreen, scene);
+  signGlow.position.set(0, 3.88, -2.86);
+  signGlow.scale.y = 0.2;
+}
+studio();
+
+const micGroup = new THREE.Group();
+scene.add(micGroup);
+const stand = cylinder(micGroup, mats.chrome, 0.025);
+orient(stand, [0.08, -0.04, 1.55], [0.08, 1.58, 1.55]);
+const boom = cylinder(micGroup, mats.chrome, 0.022);
+orient(boom, [0.08, 1.48, 1.55], [-0.34, 1.35, 1.27]);
+const mic = mesh(new THREE.CapsuleGeometry(0.12, 0.34, 8, 18), mats.foam, micGroup);
+mic.position.set(-0.46, 1.34, 1.22);
+mic.rotation.set(1.4, 0.2, -0.38);
+const pop = mesh(new THREE.TorusGeometry(0.22, 0.012, 12, 72), mats.black, micGroup);
+pop.position.set(-0.23, 1.22, 1.36);
+pop.rotation.set(1.25, 0.06, -0.4);
+
+function lights() {
+  scene.add(new THREE.AmbientLight(0x7b7062, 1.45));
+  const key = new THREE.SpotLight(0xffd89a, 9.5, 9, 0.55, 0.6);
+  key.position.set(2.8, 5.2, 3.6);
+  key.target.position.set(0, 0.8, 0);
+  key.castShadow = true;
+  key.shadow.mapSize.set(2048, 2048);
+  scene.add(key, key.target);
+
+  const rim = new THREE.PointLight(0x5de0b4, 4.4, 8);
+  rim.position.set(-2.8, 2.4, -0.2);
+  scene.add(rim);
+  const red = new THREE.PointLight(0xff4c7a, 2.8, 6);
+  red.position.set(3.1, 1.7, -1.3);
+  scene.add(red);
+  const fill = new THREE.PointLight(0xf3ead7, 1.8, 7);
+  fill.position.set(0.5, 1.6, 4.2);
+  scene.add(fill);
+}
+lights();
+
+const lyrics = [
+  [0.0, 'tiny wings in the booth, big low-end'],
+  [2.25, 'buzz on the beat and the meters go red'],
+  [4.55, 'six legs tapping, two eyes locked in'],
+  [6.85, 'producer said stop, fly dropped again'],
+  [9.15, 'no samples, just synths and a little static'],
+  [11.45, 'mic too tall so the stand got dramatic'],
+  [13.75, 'hook comes back with the wings on time'],
+  [16.05, 'fruit fly flow, take three, one mic']
+];
+
+function lyricAt(t) {
+  let line = lyrics[0][1];
+  for (const [at, l] of lyrics) if (t >= at) line = l;
+  return line;
+}
+
+function updateRig(t) {
+  const beat = Math.sin(t * Math.PI * 2 * (92 / 60));
+  const eighth = Math.sin(t * Math.PI * 2 * (92 / 60) * 2);
+  const mouth = Math.max(0, Math.sin(t * 22) * 0.5 + Math.sin(t * 13) * 0.5) * (0.4 + 0.6 * Math.max(0, beat));
+  const bounce = Math.max(0, beat) * 0.09 + Math.sin(t * 3.2) * 0.018;
+
+  fly.position.set(Math.sin(t * 1.2) * 0.035, bounce, Math.sin(t * 0.8) * 0.025);
+  fly.rotation.set(Math.sin(t * 2.1) * 0.035, Math.sin(t * 1.5) * 0.08, Math.sin(t * 2.7) * 0.04);
+  head.rotation.set(-0.05 + Math.max(0, eighth) * -0.12, Math.sin(t * 4.0) * 0.09, Math.sin(t * 2.2) * 0.05);
+
+  orient(proboscis, [0, 0.62, 1.42], [0.02, 0.48 - mouth * 0.1, 1.72 + mouth * 0.22]);
+  orient(antennae[0], [-0.16, 0.96, 1.32], [-0.45 - Math.max(0, beat) * 0.08, 1.12 + Math.sin(t * 11) * 0.04, 1.52]);
+  orient(antennae[1], [0.16, 0.96, 1.32], [0.45 + Math.max(0, beat) * 0.08, 1.12 + Math.cos(t * 11) * 0.04, 1.52]);
+
+  const wingAmp = 0.18 + Math.max(0, beat) * 0.38;
+  wingL.rotation.set(-0.18 - Math.abs(Math.sin(t * 34)) * wingAmp, 0.44, -0.42);
+  wingR.rotation.set(-0.18 - Math.abs(Math.sin(t * 34)) * wingAmp, -0.44, 0.42);
+  wingL.material.opacity = 0.3 + Math.max(0, beat) * 0.18;
+  wingR.material.opacity = wingL.material.opacity;
+
+  for (const leg of legs) {
+    const ph = Math.sin(t * 9.6 + leg.idx * 1.9 + (leg.side > 0 ? 0.7 : 0));
+    const hype = Math.max(0, beat) * 0.18;
+    const frontMic = leg.idx === 0 ? 0.42 * Math.max(0, Math.sin(t * 4.8 + leg.side)) : 0;
+    const knee = [
+      leg.side * (0.53 + leg.idx * 0.08 - frontMic * leg.side),
+      0.22 + Math.max(0, ph) * 0.16 + hype + (leg.idx === 0 ? 0.12 : 0),
+      leg.z + ph * 0.12 + frontMic
+    ];
+    const foot = [
+      leg.side * (0.85 + leg.idx * 0.09 - frontMic * 0.6 * leg.side),
+      -0.06 + Math.max(0, ph) * 0.04,
+      leg.z + ph * 0.18 + frontMic * 1.35
+    ];
+    orient(leg.upper, leg.hip, knee);
+    orient(leg.lower, knee, foot);
+    leg.knee.position.set(...knee);
+    leg.foot.position.set(...foot);
+  }
+
+  micGroup.rotation.z = Math.sin(t * 2.2) * 0.012;
+  pop.scale.setScalar(1 + Math.max(0, beat) * 0.04);
+  root.rotation.y += (-0.34 + Math.sin(t * 0.45) * 0.08 - root.rotation.y) * 0.05;
+}
+
+function resize() {
+  const w = window.innerWidth;
+  const h = window.innerHeight;
+  renderer.setSize(w, h, false);
+  camera.aspect = w / h;
+  camera.updateProjectionMatrix();
+  camera.position.set(h > w ? 4.55 : 4.2, h > w ? 3.0 : 2.7, h > w ? 7.1 : 6.6);
+  camera.lookAt(0, 0.78, 0);
+}
+window.addEventListener('resize', resize);
+resize();
+
+function renderAt(t) {
+  const loop = t % 18;
+  updateRig(loop);
+  ids.lyrics.textContent = lyricAt(loop);
+  ids.bar.style.width = `${(loop / 18) * 100}%`;
+  ids.rec.style.color = Math.floor(loop * 4) % 2 ? '#ff4c7a' : '#f6c75a';
+  renderer.render(scene, camera);
+}
+
+function animate() {
+  renderAt(clock.getElapsedTime());
+  requestAnimationFrame(animate);
+}
+
+window.__captureFrame = renderAt;
+window.__ready = true;
+window.__meta = { width: 1080, height: 1350, seconds: 18, fps: 24, audio: 'fly_rap_studio.wav' };
+animate();
+</script>
+</body>
+</html>
