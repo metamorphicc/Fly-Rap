@@ -44,19 +44,19 @@ for (let i = 0; i < total; i++) {
   for (const o of [1, 3]) {
     const sn = pulse(t, beat * 4, o * beat);
     if (sn < 0.18) {
-      s += noise(i) * envExp(sn, 0.055) * 0.34;
-      s += Math.sin(2 * Math.PI * 185 * t) * envExp(sn, 0.08) * 0.22;
+      s += noise(i) * envExp(sn, 0.045) * 0.14;
+      s += Math.sin(2 * Math.PI * 172 * t) * envExp(sn, 0.09) * 0.26;
     }
   }
 
   const hh = pulse(t, beat / 2, 0);
   if (hh < 0.035) {
-    s += noise(i * 3) * envExp(hh, 0.015) * 0.16;
+    s += noise(i * 3) * envExp(hh, 0.012) * 0.055;
   }
 
   const note = bassNotes[Math.floor(t / (beat / 2)) % bassNotes.length];
   const bassEnv = 0.42 + 0.32 * Math.max(0, Math.sin(2 * Math.PI * (t / beat)));
-  s += Math.tanh(Math.sin(2 * Math.PI * note * t) * 2.1) * 0.17 * bassEnv;
+  s += Math.tanh(Math.sin(2 * Math.PI * note * t) * 1.8) * 0.22 * bassEnv;
 
   const chordRoot = beatIndex % 8 < 4 ? 174.61 : 155.56;
   const pad = (
@@ -70,20 +70,22 @@ for (let i = 0; i < total; i++) {
     const local = pulse(t, beat * 4, syllable);
     if (local < 0.13) {
       const e = Math.sin(Math.PI * local / 0.13) ** 0.7;
-      const formant = 330 + 120 * Math.sin(t * 18) + 45 * Math.sin(t * 41);
-      const buzz = Math.sin(2 * Math.PI * formant * t) + 0.42 * Math.sin(2 * Math.PI * formant * 2.02 * t);
-      const rasp = noise(i * 11) * 0.38;
-      s += (buzz * 0.18 + rasp * 0.08) * e;
+      const formant = 185 + 42 * Math.sin(t * 9) + 22 * Math.sin(t * 17);
+      const buzz = Math.sin(2 * Math.PI * formant * t) + 0.24 * Math.sin(2 * Math.PI * formant * 1.52 * t);
+      const throat = Math.sin(2 * Math.PI * (formant * 0.5) * t) * 0.42;
+      const rasp = noise(i * 11) * 0.055;
+      s += (buzz * 0.13 + throat * 0.12 + rasp * 0.025) * e;
     }
   }
 
   const adlib = pulse(t, beat * 8, beat * 7.1);
   if (adlib < 0.42) {
     const e = Math.sin(Math.PI * adlib / 0.42);
-    s += Math.sin(2 * Math.PI * (720 + 80 * Math.sin(t * 30)) * t) * e * 0.055;
+    s += Math.sin(2 * Math.PI * (410 + 35 * Math.sin(t * 12)) * t) * e * 0.032;
   }
 
-  s = Math.tanh(s * 1.15) * 0.82;
+  const warm = s + Math.sin(2 * Math.PI * 92 * t) * 0.018;
+  s = Math.tanh(warm * 0.92) * 0.78;
   const pan = Math.sin(2 * Math.PI * 0.07 * t) * 0.18;
   const l = clamp(s * (1 - pan));
   const r = clamp(s * (1 + pan));
